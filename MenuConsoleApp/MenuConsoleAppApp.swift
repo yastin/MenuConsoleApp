@@ -16,10 +16,12 @@ struct MenuConsoleAppApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
+    private let debugLog = false
 
     // MARK: - Constants
 
-    private let projectPath = "/Volumes/GIGABYTE/DZO/dzo_local_environment"
+    private let rawProjectPath = "~/DZO/dzo_local_environment"
+    private var projectPath: String { NSString(string: rawProjectPath).expandingTildeInPath }
 
     // MARK: - Lifecycle
 
@@ -124,33 +126,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Universal Runner
 
     private func runCommand(_ command: String) {
-
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-
-        // Рабочая директория проекта
         process.currentDirectoryURL = URL(fileURLWithPath: projectPath)
-
-        // PATH для GUI-приложения
         process.environment = [
             "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
             "COMPOSE_FILE": "\(projectPath)/docker-compose.yml:\(projectPath)/docker-compose.override.yml"
         ]
+        process.arguments = ["-c", command]
 
-        process.arguments = [
-            "-c",
-            command
-        ]
+        if debugLog {
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        // Логирование
-        pipe.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
-                print("[DZO]", output.trimmingCharacters(in: .whitespacesAndNewlines))
+            process.terminationHandler = { proc in
+                let output = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let str = String(data: output, encoding: .utf8), !str.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    print("[DZO]", str)
+                }
+                try? pipe.fileHandleForReading.close()
             }
         }
 
