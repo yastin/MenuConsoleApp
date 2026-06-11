@@ -6,9 +6,8 @@ struct MenuConsoleAppApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // Без окон
         Settings {
-            EmptyView()
+            SettingsView()
         }
     }
 }
@@ -17,15 +16,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
     private let debugLog = false
+    private var settingsWindow: NSWindow?
 
-    // MARK: - Constants
+    // MARK: - Configuration
 
-    private let rawProjectPath = "~/DZO/dzo_local_environment"
-    private var projectPath: String { NSString(string: rawProjectPath).expandingTildeInPath }
+    private var projectPath: String {
+        let raw = UserDefaults.standard.string(forKey: "projectPath") ?? "~/DZO/dzo_local_environment"
+        return NSString(string: raw).expandingTildeInPath
+    }
+
+    private var composeFileEnv: String {
+        let files = UserDefaults.standard.string(forKey: "composeFiles") ?? "docker-compose.yml, docker-compose.override.yml"
+        return files
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { "\(projectPath)/\($0)" }
+            .joined(separator: ":")
+    }
 
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.applicationIconImage = makeAppIcon()
         setupMenuBar()
     }
 
@@ -35,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: "DZO")
+            button.image = NSImage(systemSymbolName: "shippingbox", accessibilityDescription: "Docker")
         }
 
         let menu = NSMenu()
@@ -53,6 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        addItem(menu, title: "Settings…", action: #selector(openSettings))
+
         let quitItem = NSMenuItem(
             title: "Quit",
             action: #selector(NSApplication.terminate(_:)),
@@ -67,6 +81,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
         menu.addItem(item)
+    }
+
+    // MARK: - Settings
+
+    @objc private func openSettings() {
+        if let window = settingsWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let view = NSHostingView(rootView: SettingsView())
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 150),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Settings"
+        window.contentView = view
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow = window
     }
 
     // MARK: - Actions (SH equivalents)
@@ -123,6 +162,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         """)
     }
 
+    // MARK: - App Icon
+
+    private func makeAppIcon() -> NSImage {
+        let size: CGFloat = 512
+        return NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            let inset = rect.insetBy(dx: 20, dy: 20)
+            let path = NSBezierPath(roundedRect: inset, xRadius: 100, yRadius: 100)
+
+            let gradient = NSGradient(
+                starting: NSColor(srgbRed: 0.13, green: 0.59, blue: 0.95, alpha: 1),
+                ending: NSColor(srgbRed: 0.06, green: 0.31, blue: 0.78, alpha: 1)
+            )
+            gradient?.draw(in: path, angle: -90)
+
+            if let symbol = NSImage(systemSymbolName: "shippingbox.fill", accessibilityDescription: nil) {
+                let config = NSImage.SymbolConfiguration(pointSize: 200, weight: .light)
+                    .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
+                if let configured = symbol.withSymbolConfiguration(config) {
+                    let symbolSize = configured.size
+                    let origin = NSPoint(
+                        x: (rect.width - symbolSize.width) / 2,
+                        y: (rect.height - symbolSize.height) / 2
+                    )
+                    configured.draw(at: origin, from: .zero, operation: .sourceOver, fraction: 1)
+                }
+            }
+
+            return true
+        }
+    }
+
     // MARK: - Universal Runner
 
     private func runCommand(_ command: String) {
@@ -131,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         process.currentDirectoryURL = URL(fileURLWithPath: projectPath)
         process.environment = [
             "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-            "COMPOSE_FILE": "\(projectPath)/docker-compose.yml:\(projectPath)/docker-compose.override.yml"
+            "COMPOSE_FILE": composeFileEnv
         ]
         process.arguments = ["-c", command]
 
