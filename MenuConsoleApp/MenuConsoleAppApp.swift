@@ -120,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// my)
     @objc private func runMy() {
         runCommand("""
-        docker compose up -d web user_php search_php entity_php econtracting_php search_php_workers entity_php_workers search_feed legacy_es legacy_cron legacy_php mysql postgres mongo rabbit redis elasticsearch && \
+        docker compose up -d binotel kibana web user_php search_php entity_php econtracting_php search_php_workers entity_php_workers search_feed legacy_es legacy_cron legacy_php mysql postgres mongo rabbit redis elasticsearch && \
         docker compose stop binotel kibana
         """)
     }
@@ -128,7 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// mini)
     @objc private func runMini() {
         runCommand("""
-        docker compose up -d web user_php search_php entity_php econtracting_php legacy_es legacy_php mysql postgres mongo rabbit redis elasticsearch && \
+        docker compose up -d binotel kibana web user_php search_php entity_php econtracting_php legacy_es legacy_php mysql postgres mongo rabbit redis elasticsearch && \
         docker compose stop binotel kibana
         """)
     }
@@ -136,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// mini_external)
     @objc private func runMiniExternal() {
         runCommand("""
-        docker compose up -d web user_php search_php entity_php econtracting_php legacy_es legacy_php redis && \
+        docker compose up -d binotel kibana web user_php search_php entity_php econtracting_php legacy_es legacy_php redis && \
         docker compose stop binotel kibana mysql postgres mongo rabbit elasticsearch
         """)
     }
